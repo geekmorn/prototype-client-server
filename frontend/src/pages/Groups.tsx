@@ -14,16 +14,13 @@ import {
   DialogActions,
   TextField,
   Alert,
-  IconButton,
   Chip,
 } from '@mui/material';
 import {
   Add,
   People,
-  Edit,
-  Delete,
 } from '@mui/icons-material';
-import { useGroups, useCreateGroup, useDeleteGroup } from '../hooks/useApi';
+import { useGroups, useCreateGroup } from '../hooks/useApi';
 import { GroupCreate, Group } from '../types';
 import GroupEditModal from '../components/GroupEditModal';
 import GroupDetailModal from '../components/GroupDetailModal';
@@ -51,11 +48,6 @@ const Groups: React.FC = () => {
     },
   });
   
-  const deleteGroupMutation = useDeleteGroup({
-    onError: (err: any) => {
-      setError(err.response?.data?.detail || 'Failed to delete group');
-    },
-  });
 
   const handleCreateGroup = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,11 +58,6 @@ const Groups: React.FC = () => {
     createGroupMutation.mutate(formData);
   };
 
-  const handleDeleteGroup = (groupId: number) => {
-    if (window.confirm('Are you sure you want to delete this group?')) {
-      deleteGroupMutation.mutate(groupId);
-    }
-  };
 
   const handleViewDetails = (group: Group) => {
     // Always update selectedGroup to the new group
@@ -78,11 +65,6 @@ const Groups: React.FC = () => {
     setDetailModalOpen(true);
   };
 
-  const handleEditGroup = (group: Group) => {
-    // Always update selectedGroup to the new group
-    setSelectedGroup(group);
-    setEditModalOpen(true);
-  };
 
   const handleEditSuccess = () => {
     setEditModalOpen(false);
@@ -206,7 +188,7 @@ const Groups: React.FC = () => {
                     Created {new Date(group.created_at).toLocaleDateString()}
                   </Typography>
                 </CardContent>
-                <CardActions className="justify-between">
+                <CardActions className="justify-center">
                   <Button
                     size="small"
                     onClick={() => handleViewDetails(group)}
@@ -214,22 +196,6 @@ const Groups: React.FC = () => {
                   >
                     View Details
                   </Button>
-                  <Box>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleEditGroup(group)}
-                      className="text-gray-600"
-                    >
-                      <Edit />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleDeleteGroup(group.id)}
-                      className="text-red-600"
-                    >
-                      <Delete />
-                    </IconButton>
-                  </Box>
                 </CardActions>
               </Card>
             </Grid>
@@ -293,7 +259,10 @@ const Groups: React.FC = () => {
         open={detailModalOpen}
         onClose={handleModalClose}
         groupId={selectedGroup?.id || null}
-        onEdit={handleEditGroup}
+        onEdit={(group) => {
+          setSelectedGroup(group);
+          setEditModalOpen(true);
+        }}
         onDelete={handleDetailDelete}
       />
     </Container>

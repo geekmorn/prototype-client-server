@@ -26,6 +26,7 @@ export const queryKeys = {
   group: (id: number) => ['groups', id] as const,
   groupMembers: (id: number) => ['groups', id, 'members'] as const,
   expenses: (groupId: number) => ['expenses', groupId] as const,
+  allExpenses: ['expenses', 'all'] as const,
   expense: (id: number) => ['expenses', id] as const,
   expenseSummary: (groupId: number) => ['expenses', groupId, 'summary'] as const,
   balanceSummary: (groupId: number) => ['expenses', groupId, 'balance'] as const,
@@ -348,6 +349,14 @@ export const useGroupExpenses = (groupId: number, limit: number = 100, offset: n
   });
 };
 
+export const useAllExpenses = (limit: number = 100, offset: number = 0, options?: UseQueryOptions<Expense[]>) => {
+  return useQuery({
+    queryKey: [...queryKeys.allExpenses, { limit, offset }],
+    queryFn: () => apiClient.getAllExpenses(limit, offset),
+    ...options,
+  });
+};
+
 export const useExpense = (expenseId: number, options?: UseQueryOptions<Expense>) => {
   return useQuery({
     queryKey: queryKeys.expense(expenseId),
@@ -358,44 +367,266 @@ export const useExpense = (expenseId: number, options?: UseQueryOptions<Expense>
 
 export const useCreateExpense = (options?: UseMutationOptions<Expense, Error, ExpenseCreate>) => {
   const queryClient = useQueryClient();
-  
+  const { onSuccess, onError, onSettled, ...rest } = options || {} as any;
+
   return useMutation({
     mutationFn: (expenseData: ExpenseCreate) => apiClient.createExpense(expenseData),
-    onSuccess: (data) => {
+    onMutate: async (newExpense) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.expenses(newExpense.group_id) });
+      await queryClient.cancelQueries({ queryKey: queryKeys.expenseSummary(newExpense.group_id) });
+      await queryClient.cancelQueries({ queryKey: queryKeys.balanceSummary(newExpense.group_id) });
+
+      // Snapshot the previous value
+      const previousExpenses = queryClient.getQueryData<Expense[]>(queryKeys.expenses(newExpense.group_id));
+      const previousSummary = queryClient.getQueryData<ExpenseSummary>(queryKeys.expenseSummary(newExpense.group_id));
+      const previousBalance = queryClient.getQueryData<BalanceSummary>(queryKeys.balanceSummary(newExpense.group_id));
+
+      // Optimistically update the expenses list
+      const optimisticExpense: Expense = {
+        id: Date.now() * -1, // temporary negative id
+        group_id: newExpense.group_id,
+        paid_by_user_id: 0, // Will be updated when real data comes in
+        amount: newExpense.amount.toString(),
+        description: newExpense.description,
+        category: newExpense.category,
+        metadata: newExpense.metadata,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        paid_by_user: {
+          id: 0,
+          email: 'Loading...',
+          full_name: 'Loading...',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+      };
+
+      queryClient.setQueryData<Expense[]>(queryKeys.expenses(newExpense.group_id), (old) => {
+        if (!old) return [optimisticExpense];
+        return [optimisticExpense, ...old];
+      });
+
+      return { previousExpenses, previousSummary, previousBalance, groupId: newExpense.group_id };
+    },
+    onSuccess: (data, variables, context) => {
+      // Replace optimistic expense with real data
+      queryClient.setQueryData<Expense[]>(queryKeys.expenses(data.group_id), (oldData) => {
+        if (!oldData) return [data];
+        return oldData.map((expense) => 
+          expense.id === (context?.previousExpenses ? Date.now() * -1 : -1) ? data : expense
+        );
+      });
+
+      // Add to all expenses cache
+      queryClient.setQueryData<Expense[]>(queryKeys.allExpenses, (oldData) => {
+        if (!oldData) return [data];
+        return [data, ...oldData];
+      });
+
+      // Invalidate to get fresh summary data
       queryClient.invalidateQueries({ queryKey: queryKeys.expenses(data.group_id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.expenseSummary(data.group_id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.balanceSummary(data.group_id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.allExpenses });
+
+      if (onSuccess) onSuccess(data, variables, context);
     },
-    ...options,
+    onError: (error, variables, context) => {
+      // Rollback on error
+      if (context?.previousExpenses) {
+        queryClient.setQueryData(queryKeys.expenses(context.groupId), context.previousExpenses);
+      }
+      if (context?.previousSummary) {
+        queryClient.setQueryData(queryKeys.expenseSummary(context.groupId), context.previousSummary);
+      }
+      if (context?.previousBalance) {
+        queryClient.setQueryData(queryKeys.balanceSummary(context.groupId), context.previousBalance);
+      }
+      if (onError) onError(error, variables, context);
+    },
+    onSettled: (data, error, variables, context) => {
+      if (onSettled) onSettled(data, error, variables, context);
+    },
+    ...(rest as object),
   });
 };
 
 export const useUpdateExpense = (expenseId: number, options?: UseMutationOptions<Expense, Error, ExpenseUpdate>) => {
   const queryClient = useQueryClient();
-  
+  const { onSuccess, onError, onSettled, ...rest } = options || {} as any;
+
   return useMutation({
     mutationFn: (expenseData: ExpenseUpdate) => apiClient.updateExpense(expenseId, expenseData),
-    onSuccess: (data) => {
-      queryClient.setQueryData(queryKeys.expense(expenseId), data);
-      queryClient.invalidateQueries({ queryKey: queryKeys.expenses(data.group_id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.expenseSummary(data.group_id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.balanceSummary(data.group_id) });
+    onMutate: async (updatedExpenseData) => {
+      // First, get the current expense to know which group it belongs to
+      let currentExpense = queryClient.getQueryData<Expense>(queryKeys.expense(expenseId));
+      
+      // If not in individual cache, try to find it in the expenses list
+      if (!currentExpense) {
+        // We need to find which group this expense belongs to
+        // This is a fallback - ideally the expense should be in cache
+        const allExpenseQueries = queryClient.getQueriesData({ queryKey: ['expenses'] });
+        for (const [queryKey, data] of allExpenseQueries) {
+          if (Array.isArray(data)) {
+            const foundExpense = data.find(exp => exp.id === expenseId);
+            if (foundExpense) {
+              currentExpense = foundExpense;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (!currentExpense) {
+        console.warn('Could not find current expense data for optimistic update');
+        return;
+      }
+
+      const groupId = currentExpense.group_id;
+
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.expenses(groupId) });
+      await queryClient.cancelQueries({ queryKey: queryKeys.expenseSummary(groupId) });
+      await queryClient.cancelQueries({ queryKey: queryKeys.balanceSummary(groupId) });
+      await queryClient.cancelQueries({ queryKey: queryKeys.expense(expenseId) });
+
+      // Snapshot the previous values
+      const previousExpenses = queryClient.getQueryData<Expense[]>(queryKeys.expenses(groupId));
+      const previousExpense = queryClient.getQueryData<Expense>(queryKeys.expense(expenseId));
+      const previousSummary = queryClient.getQueryData<ExpenseSummary>(queryKeys.expenseSummary(groupId));
+      const previousBalance = queryClient.getQueryData<BalanceSummary>(queryKeys.balanceSummary(groupId));
+
+      // Create optimistic update
+      const optimisticExpense: Expense = {
+        ...currentExpense,
+        ...updatedExpenseData,
+        amount: updatedExpenseData.amount ? updatedExpenseData.amount.toString() : currentExpense.amount,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Optimistically update the individual expense
+      queryClient.setQueryData<Expense>(queryKeys.expense(expenseId), optimisticExpense);
+
+      // Optimistically update the expenses list
+      queryClient.setQueryData<Expense[]>(queryKeys.expenses(groupId), (old) => {
+        if (!old) return old;
+        return old.map((expense) => 
+          expense.id === expenseId ? optimisticExpense : expense
+        );
+      });
+
+      return { 
+        previousExpenses, 
+        previousExpense, 
+        previousSummary, 
+        previousBalance, 
+        groupId 
+      };
     },
-    ...options,
+    onSuccess: (data, variables, context) => {
+      // Update with real data from server
+      queryClient.setQueryData(queryKeys.expense(expenseId), data);
+      
+      if (context?.groupId) {
+        queryClient.setQueryData<Expense[]>(queryKeys.expenses(context.groupId), (old) => {
+          if (!old) return old;
+          return old.map((expense) => 
+            expense.id === expenseId ? data : expense
+          );
+        });
+
+        // Invalidate to get fresh summary data
+        queryClient.invalidateQueries({ queryKey: queryKeys.expenses(context.groupId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.expenseSummary(context.groupId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.balanceSummary(context.groupId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.allExpenses });
+      } else {
+        // Fallback: invalidate all expense queries if we don't have groupId
+        queryClient.invalidateQueries({ queryKey: ['expenses'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.allExpenses });
+      }
+
+      if (onSuccess) onSuccess(data, variables, context);
+    },
+    onError: (error, variables, context) => {
+      // Rollback on error
+      if (context?.previousExpense) {
+        queryClient.setQueryData(queryKeys.expense(expenseId), context.previousExpense);
+      }
+      if (context?.previousExpenses) {
+        queryClient.setQueryData(queryKeys.expenses(context.groupId), context.previousExpenses);
+      }
+      if (context?.previousSummary) {
+        queryClient.setQueryData(queryKeys.expenseSummary(context.groupId), context.previousSummary);
+      }
+      if (context?.previousBalance) {
+        queryClient.setQueryData(queryKeys.balanceSummary(context.groupId), context.previousBalance);
+      }
+      if (onError) onError(error, variables, context);
+    },
+    onSettled: (data, error, variables, context) => {
+      if (onSettled) onSettled(data, error, variables, context);
+    },
+    ...(rest as object),
   });
 };
 
-export const useDeleteExpense = (options?: UseMutationOptions<void, Error, number>) => {
+export const useDeleteExpense = (groupId?: number, options?: UseMutationOptions<void, Error, number>) => {
   const queryClient = useQueryClient();
-  
+  const { onSuccess, onError, onSettled, ...rest } = options || {} as any;
+
   return useMutation({
     mutationFn: (expenseId: number) => apiClient.deleteExpense(expenseId),
-    onSuccess: (_, expenseId) => {
-      // We need to get the group_id from the expense to invalidate the right queries
-      // For now, invalidate all expense-related queries
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    onMutate: async (expenseId) => {
+      if (!groupId) return;
+
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.expenses(groupId) });
+      await queryClient.cancelQueries({ queryKey: queryKeys.expenseSummary(groupId) });
+      await queryClient.cancelQueries({ queryKey: queryKeys.balanceSummary(groupId) });
+
+      // Snapshot the previous value
+      const previousExpenses = queryClient.getQueryData<Expense[]>(queryKeys.expenses(groupId));
+      const previousSummary = queryClient.getQueryData<ExpenseSummary>(queryKeys.expenseSummary(groupId));
+      const previousBalance = queryClient.getQueryData<BalanceSummary>(queryKeys.balanceSummary(groupId));
+
+      // Optimistically remove the expense
+      queryClient.setQueryData<Expense[]>(queryKeys.expenses(groupId), (old) => {
+        if (!old) return old;
+        return old.filter((expense) => expense.id !== expenseId);
+      });
+
+      return { previousExpenses, previousSummary, previousBalance, groupId };
     },
-    ...options,
+    onSuccess: (_, expenseId, context) => {
+      if (context?.groupId) {
+        // Invalidate to get fresh data
+        queryClient.invalidateQueries({ queryKey: queryKeys.expenses(context.groupId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.expenseSummary(context.groupId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.balanceSummary(context.groupId) });
+      }
+      // Also invalidate all expenses cache
+      queryClient.invalidateQueries({ queryKey: queryKeys.allExpenses });
+      if (onSuccess) onSuccess(_, expenseId, context as any);
+    },
+    onError: (error, expenseId, context) => {
+      // Rollback on error
+      if (context?.previousExpenses) {
+        queryClient.setQueryData(queryKeys.expenses(context.groupId), context.previousExpenses);
+      }
+      if (context?.previousSummary) {
+        queryClient.setQueryData(queryKeys.expenseSummary(context.groupId), context.previousSummary);
+      }
+      if (context?.previousBalance) {
+        queryClient.setQueryData(queryKeys.balanceSummary(context.groupId), context.previousBalance);
+      }
+      if (onError) onError(error, expenseId, context as any);
+    },
+    onSettled: (data, error, expenseId, context) => {
+      if (onSettled) onSettled(data, error, expenseId, context as any);
+    },
+    ...(rest as object),
   });
 };
 

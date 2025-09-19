@@ -16,19 +16,18 @@ import {
   TrendingUp,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
-import { useGroups, useGroupExpenses } from '../hooks/useApi';
+import { useGroups, useAllExpenses } from '../hooks/useApi';
 import { useNavigate } from 'react-router-dom';
 
 const Home: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const { data: groups } = useGroups();
+  const { data: allExpenses = [], isLoading: expensesLoading } = useAllExpenses(100, 0, {
+    enabled: isAuthenticated
+  } as any);
   const navigate = useNavigate();
 
-  // Get expenses from all groups for summary
-  // For now, we'll use a simplified approach without calling hooks in a loop
-  const allExpenses: any[] = [];
-
-  const totalExpenses = allExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const totalExpenses = allExpenses.reduce((sum, expense) => sum + parseFloat(expense.amount), 0);
   const recentExpenses = allExpenses
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 5);
@@ -185,7 +184,13 @@ const Home: React.FC = () => {
                   View All
                 </Button>
               </Box>
-              {recentExpenses.length === 0 ? (
+              {expensesLoading ? (
+                <Box className="text-center py-8">
+                  <Typography variant="body2" className="text-gray-500">
+                    Loading expenses...
+                  </Typography>
+                </Box>
+              ) : recentExpenses.length === 0 ? (
                 <Box className="text-center py-8">
                   <Receipt className="text-6xl text-gray-400 mb-4" />
                   <Typography variant="h6" className="text-gray-600 mb-2">
@@ -209,7 +214,7 @@ const Home: React.FC = () => {
                       <Box className="flex justify-between items-start">
                         <Box>
                           <Typography variant="body1" className="font-medium">
-                            ${expense.amount.toFixed(2)}
+                            ${parseFloat(expense.amount).toFixed(2)}
                           </Typography>
                           <Typography variant="body2" className="text-gray-600">
                             {expense.description || 'No description'}

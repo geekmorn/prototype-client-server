@@ -30,7 +30,7 @@ class ApiClient {
 
   constructor() {
     this.client = axios.create({
-      baseURL: 'http://0.0.0.0:8000',
+      baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -183,6 +183,13 @@ class ApiClient {
 
   async getGroupBalanceSummary(groupId: number): Promise<BalanceSummary> {
     const response: AxiosResponse<BalanceSummary> = await this.client.get(`/expenses/groups/${groupId}/balance`);
+    return response.data;
+  }
+
+  async getAllExpenses(limit: number = 100, offset: number = 0): Promise<Expense[]> {
+    const response: AxiosResponse<Expense[]> = await this.client.get('/expenses', {
+      params: { limit, offset }
+    });
     return response.data;
   }
 

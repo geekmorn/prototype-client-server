@@ -51,7 +51,7 @@ const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
 
   const { data: groups } = useGroups();
 
-  const deleteExpenseMutation = useDeleteExpense({
+  const deleteExpenseMutation = useDeleteExpense(expenseId || 0, {
     onSuccess: () => {
       onClose();
       if (onDelete) onDelete();

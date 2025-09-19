@@ -14,7 +14,6 @@ import {
   DialogActions,
   TextField,
   Alert,
-  IconButton,
   FormControl,
   InputLabel,
   Select,
@@ -26,15 +25,13 @@ import {
 import {
   Add,
   Receipt,
-  Edit,
-  Delete,
   FilterList,
   Visibility,
   AttachMoney,
   TrendingUp,
   People,
 } from '@mui/icons-material';
-import { useGroups, useGroupExpenses, useCreateExpense, useDeleteExpense, useExpenseSummary, useBalanceSummary } from '../hooks/useApi';
+import { useGroups, useGroupExpenses, useAllExpenses, useCreateExpense, useExpenseSummary, useBalanceSummary } from '../hooks/useApi';
 import { ExpenseCreate, Expense } from '../types';
 import ExpenseEditModal from '../components/ExpenseEditModal';
 import ExpenseDetailModal from '../components/ExpenseDetailModal';
@@ -55,17 +52,28 @@ const Expenses: React.FC = () => {
   
   const { data: groups, isLoading: groupsLoading, error: groupsError } = useGroups();
   
-  // Load expenses for the selected group
+  // Load all expenses by default, or group expenses if filter is selected
   const { 
-    data: expenses, 
-    isLoading: expensesLoading, 
-    error: expensesError 
+    data: allExpenses, 
+    isLoading: allExpensesLoading, 
+    error: allExpensesError 
+  } = useAllExpenses(100, 0, { enabled: !filterGroup } as any);
+
+  const { 
+    data: groupExpenses, 
+    isLoading: groupExpensesLoading, 
+    error: groupExpensesError 
   } = useGroupExpenses(
     filterGroup as number, 
     100, 
     0, 
     { enabled: !!filterGroup } as any
   );
+
+  // Use the appropriate expenses based on filter
+  const expenses = filterGroup ? groupExpenses : allExpenses;
+  const expensesLoading = filterGroup ? groupExpensesLoading : allExpensesLoading;
+  const expensesError = filterGroup ? groupExpensesError : allExpensesError;
 
   // Load summary data for the selected group
   const { data: expenseSummary } = useExpenseSummary(
@@ -89,11 +97,6 @@ const Expenses: React.FC = () => {
     },
   });
   
-  const deleteExpenseMutation = useDeleteExpense({
-    onError: (err: any) => {
-      setError(err.response?.data?.detail || 'Failed to delete expense');
-    },
-  });
 
   const handleCreateExpense = (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,21 +107,19 @@ const Expenses: React.FC = () => {
     createExpenseMutation.mutate(formData);
   };
 
-  const handleDeleteExpense = (expenseId: number) => {
-    if (window.confirm('Are you sure you want to delete this expense?')) {
-      deleteExpenseMutation.mutate(expenseId);
+  // Auto-set group_id when filterGroup changes
+  useEffect(() => {
+    if (filterGroup && filterGroup !== formData.group_id) {
+      setFormData(prev => ({ ...prev, group_id: filterGroup as number }));
     }
-  };
+  }, [filterGroup]);
+
 
   const handleViewDetails = (expense: Expense) => {
     setSelectedExpense(expense);
     setDetailModalOpen(true);
   };
 
-  const handleEditExpense = (expense: Expense) => {
-    setSelectedExpense(expense);
-    setEditModalOpen(true);
-  };
 
   const handleEditSuccess = () => {
     setEditModalOpen(false);
@@ -157,17 +158,6 @@ const Expenses: React.FC = () => {
   const isLoading = groupsLoading || expensesLoading;
   const hasError = groupsError || expensesError;
 
-  // Temporary debug logging
-  console.log('Expenses Debug:', {
-    filterGroup,
-    groups: groups?.length,
-    expenses: expenses?.length,
-    expensesLoading,
-    expensesError: expensesError?.message,
-    expenseSummary,
-    balanceSummary
-  });
-
   if (isLoading) {
     return (
       <Container>
@@ -197,7 +187,12 @@ const Expenses: React.FC = () => {
         <Button
           variant="contained"
           startIcon={<Add />}
-          onClick={() => setCreateModalOpen(true)}
+          onClick={() => {
+            if (filterGroup) {
+              setFormData(prev => ({ ...prev, group_id: filterGroup as number }));
+            }
+            setCreateModalOpen(true);
+          }}
           className="bg-primary-600 hover:bg-primary-700"
         >
           Add Expense
@@ -213,13 +208,13 @@ const Expenses: React.FC = () => {
       {/* Filter by Group */}
       <Box className="mb-6">
         <FormControl fullWidth className="max-w-xs">
-          <InputLabel>Select Group to View Expenses</InputLabel>
+          <InputLabel>Filter by Group (Optional)</InputLabel>
           <Select
             value={filterGroup}
             onChange={(e) => setFilterGroup(e.target.value as number | '')}
-            label="Select Group to View Expenses"
+            label="Filter by Group (Optional)"
           >
-            <MenuItem value="">Select a group...</MenuItem>
+            <MenuItem value="">All Groups</MenuItem>
             {groups?.map((group) => (
               <MenuItem key={group.id} value={group.id}>
                 {group.name}
@@ -331,19 +326,7 @@ const Expenses: React.FC = () => {
       )}
 
       {/* Expenses List */}
-      {!filterGroup ? (
-        <Card>
-          <CardContent className="text-center py-12">
-            <Receipt className="text-6xl text-gray-400 mb-4" />
-            <Typography variant="h6" className="text-gray-600 mb-2">
-              Select a Group
-            </Typography>
-            <Typography variant="body2" className="text-gray-500 mb-4">
-              Choose a group from the dropdown above to view and manage expenses
-            </Typography>
-          </CardContent>
-        </Card>
-      ) : expensesLoading ? (
+      {expensesLoading ? (
         <Box className="flex justify-center items-center py-8">
           <CircularProgress />
         </Box>
@@ -355,12 +338,20 @@ const Expenses: React.FC = () => {
               No expenses found
             </Typography>
             <Typography variant="body2" className="text-gray-500 mb-4">
-              No expenses in this group yet. Add your first expense to get started!
+              {filterGroup 
+                ? 'No expenses in this group yet. Add your first expense to get started!'
+                : 'No expenses found across all your groups. Add your first expense to get started!'
+              }
             </Typography>
             <Button
               variant="contained"
               startIcon={<Add />}
-              onClick={() => setCreateModalOpen(true)}
+              onClick={() => {
+                if (filterGroup) {
+                  setFormData(prev => ({ ...prev, group_id: filterGroup as number }));
+                }
+                setCreateModalOpen(true);
+              }}
               className="bg-primary-600 hover:bg-primary-700"
             >
               Add Expense
@@ -400,7 +391,7 @@ const Expenses: React.FC = () => {
                       {new Date(expense.created_at).toLocaleDateString()}
                     </Typography>
                   </CardContent>
-                  <CardActions className="justify-between">
+                  <CardActions className="justify-center">
                     <Button
                       size="small"
                       onClick={() => handleViewDetails(expense)}
@@ -409,22 +400,6 @@ const Expenses: React.FC = () => {
                     >
                       View Details
                     </Button>
-                    <Box>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleEditExpense(expense)}
-                        className="text-gray-600"
-                      >
-                        <Edit />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteExpense(expense.id)}
-                        className="text-red-600"
-                      >
-                        <Delete />
-                      </IconButton>
-                    </Box>
                   </CardActions>
                 </Card>
               </Grid>
@@ -513,7 +488,10 @@ const Expenses: React.FC = () => {
         open={detailModalOpen}
         onClose={handleModalClose}
         expenseId={selectedExpense?.id || null}
-        onEdit={handleEditExpense}
+        onEdit={(expense) => {
+          setSelectedExpense(expense);
+          setEditModalOpen(true);
+        }}
         onDelete={handleDetailDelete}
       />
     </Container>
