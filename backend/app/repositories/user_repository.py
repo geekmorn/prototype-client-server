@@ -3,7 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.models.user import User
-from app.schemas.user import UserCreate
+from app.schemas.user import UserCreate, UserUpdate
+from app.core.security import get_password_hash
 
 
 class UserRepository:
@@ -19,8 +20,26 @@ class UserRepository:
         return result.scalar_one_or_none()
 
     async def create(self, data: UserCreate) -> User:
-        user = User(email=data.email, full_name=data.full_name)
+        hashed_password = get_password_hash(data.password)
+        user = User(
+            email=data.email, 
+            full_name=data.full_name,
+            hashed_password=hashed_password
+        )
         self.session.add(user)
+        await self.session.flush()
+        await self.session.refresh(user)
+        return user
+
+    async def update(self, user_id: int, data: UserUpdate) -> Optional[User]:
+        user = await self.get_by_id(user_id)
+        if not user:
+            return None
+        
+        update_data = data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(user, field, value)
+        
         await self.session.flush()
         await self.session.refresh(user)
         return user

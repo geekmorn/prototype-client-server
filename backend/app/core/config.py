@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     database_name: str = "appdb"
     database_sslmode: str = "disable"
     alembic_script_location: str = "alembic"
+    
+    # JWT settings
+    secret_key: str = "your-secret-key-change-in-production"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
 
 
 @lru_cache
