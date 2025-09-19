@@ -22,23 +22,16 @@ services:
       dockerfile: Dockerfile
     container_name: fastproto-backend
     environment:
-      # Application Configuration
       APP_NAME: ${APP_NAME:-Fast Prototype API}
       APP_ENV: ${APP_ENV:-production}
       DEBUG: ${DEBUG:-false}
-      
-      # Database Configuration
       DATABASE_HOST: db
       DATABASE_PORT: 5432
       DATABASE_USER: ${DATABASE_USER:-${POSTGRES_USER:-appuser}}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-${POSTGRES_PASSWORD:-apppassword}}
       DATABASE_NAME: ${DATABASE_NAME:-${POSTGRES_DB:-appdb}}
       DATABASE_SSLMODE: ${DATABASE_SSLMODE:-disable}
-      
-      # Alternative: Direct database URL (overrides individual components above)
       DATABASE_URL: ${DATABASE_URL}
-      
-      # Alembic Configuration
       ALEMBIC_SCRIPT_LOCATION: ${ALEMBIC_SCRIPT_LOCATION:-alembic}
     depends_on:
       db:
@@ -46,6 +39,18 @@ services:
     ports:
       - "8000:8000"
     command: ["/bin/sh", "-c", "python -m app.utils.wait_for_db && python run_migrations.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8000}
+    container_name: fastproto-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
 
 volumes:
   db_data:
