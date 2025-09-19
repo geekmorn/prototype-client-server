@@ -21,18 +21,21 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: fastproto-backend
+    env_file:
+      - ./backend/.env
     environment:
       APP_NAME: ${APP_NAME:-Fast Prototype API}
       APP_ENV: ${APP_ENV:-production}
       DEBUG: ${DEBUG:-false}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret}
       DATABASE_HOST: db
       DATABASE_PORT: 5432
       DATABASE_USER: ${DATABASE_USER:-${POSTGRES_USER:-appuser}}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-${POSTGRES_PASSWORD:-apppassword}}
       DATABASE_NAME: ${DATABASE_NAME:-${POSTGRES_DB:-appdb}}
       DATABASE_SSLMODE: ${DATABASE_SSLMODE:-disable}
-      DATABASE_URL: ${DATABASE_URL}
       ALEMBIC_SCRIPT_LOCATION: ${ALEMBIC_SCRIPT_LOCATION:-alembic}
+      # SECRET_KEY will be loaded from env_file if present
     depends_on:
       db:
         condition: service_healthy

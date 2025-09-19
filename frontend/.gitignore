@@ -21,3 +21,25 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# env files
+.env
+.env.*
+!.env.example
+
+# editor/project files
+.vscode/
+.idea/
+*.iml
+
+# caches
+.eslintcache
+*.tsbuildinfo
+
+# additional logs
+pnpm-debug.log*
+*.log
+
+# misc
+*.swp
+*.swo
