@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.group_repository import GroupRepository
 from app.repositories.user_repository import UserRepository
-from app.schemas.group import GroupCreate, GroupUpdate, GroupRead, GroupMemberCreate, GroupWithMembers
+from app.schemas.group import GroupCreate, GroupUpdate, GroupRead, GroupMemberCreate, GroupWithMembers, GroupMemberRead
 from app.models.group import Group, GroupMember
 
 
@@ -87,3 +87,14 @@ class GroupService:
         if success:
             await self.session.commit()
         return success
+
+    async def get_group_members(self, group_id: int, user_id: int) -> List[GroupMemberRead]:
+        # Check if user is a member of the group
+        if not await self.repo.is_member(group_id, user_id):
+            raise ValueError("You must be a member of the group to view members")
+        
+        group = await self.repo.get_group_with_members(group_id)
+        if not group:
+            raise ValueError("Group not found")
+        
+        return [GroupMemberRead.model_validate(member) for member in group.members]

@@ -21,14 +21,24 @@ async def signup(payload: UserCreate, session: AsyncSession = Depends(get_sessio
 @router.post("/login", response_model=Token)
 async def login(payload: UserLogin, session: AsyncSession = Depends(get_session)) -> Token:
     service = UserService(session)
-    token = await service.authenticate_user(payload)
-    if not token:
+    try:
+        token = await service.authenticate_user(payload)
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return token
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return token
 
 
 @router.get("/me", response_model=UserRead)

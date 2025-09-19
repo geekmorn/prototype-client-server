@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_session, get_current_user
-from app.schemas.group import GroupCreate, GroupUpdate, GroupRead, GroupWithMembers, GroupMemberCreate
+from app.schemas.group import GroupCreate, GroupUpdate, GroupRead, GroupWithMembers, GroupMemberCreate, GroupMemberRead
 from app.services.group_service import GroupService
 from app.models.user import User
 
@@ -105,5 +105,19 @@ async def remove_member(
         success = await service.remove_member(group_id, user_id, current_user.id)
         if not success:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/{group_id}/members", response_model=list[GroupMemberRead])
+async def get_group_members(
+    group_id: int,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+) -> list[GroupMemberRead]:
+    service = GroupService(session)
+    try:
+        members = await service.get_group_members(group_id, current_user.id)
+        return members
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

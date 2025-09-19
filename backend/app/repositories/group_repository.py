@@ -105,3 +105,11 @@ class GroupRepository:
             )
         )
         return result.scalar_one_or_none() is not None
+
+    async def get_group_with_members(self, group_id: int) -> Optional[Group]:
+        result = await self.session.execute(
+            select(Group)
+            .where(Group.id == group_id)
+            .options(selectinload(Group.members).selectinload(GroupMember.user))
+        )
+        return result.scalar_one_or_none()

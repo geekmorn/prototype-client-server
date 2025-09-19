@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_session, get_current_user
-from app.schemas.expense import ExpenseCreate, ExpenseUpdate, ExpenseRead, ExpenseSummary
+from app.schemas.expense import ExpenseCreate, ExpenseUpdate, ExpenseRead, ExpenseSummary, BalanceSummary
 from app.services.expense_service import ExpenseService
 from app.models.user import User
 
@@ -91,5 +91,18 @@ async def get_group_expense_summary(
     service = ExpenseService(session)
     try:
         return await service.get_group_expense_summary(group_id, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/groups/{group_id}/balance", response_model=BalanceSummary)
+async def get_group_balance_summary(
+    group_id: int,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+) -> BalanceSummary:
+    service = ExpenseService(session)
+    try:
+        return await service.get_group_balance_summary(group_id, current_user.id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

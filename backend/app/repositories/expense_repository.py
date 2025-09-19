@@ -29,6 +29,9 @@ class ExpenseRepository:
         self.session.add(expense)
         await self.session.flush()
         await self.session.refresh(expense)
+        
+        # Load the relationship
+        await self.session.refresh(expense, ['paid_by_user'])
         return expense
 
     async def get_by_id(self, expense_id: int) -> Optional[Expense]:
