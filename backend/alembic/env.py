@@ -32,9 +32,12 @@ if not DATABASE_URL:
     # Build from parts to mirror app settings
     host = os.getenv("DATABASE_HOST", "localhost")
     port = os.getenv("DATABASE_PORT", "5432")
-    user = os.getenv("DATABASE_USER", "appuser")
-    password = os.getenv("DATABASE_PASSWORD", "apppassword")
-    name = os.getenv("DATABASE_NAME", "appdb")
+    user = os.getenv("DATABASE_USER")
+    password = os.getenv("DATABASE_PASSWORD")
+    name = os.getenv("DATABASE_NAME")
+    
+    if not all([user, password, name]):
+        raise ValueError("DATABASE_USER, DATABASE_PASSWORD, and DATABASE_NAME environment variables must be set")
     sslmode = os.getenv("DATABASE_SSLMODE", "disable")
     
     # For asyncpg, we don't include sslmode in URL - SSL is configured differently

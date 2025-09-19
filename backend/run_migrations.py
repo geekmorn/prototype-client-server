@@ -15,9 +15,12 @@ async def run_migrations():
     if not database_url:
         host = os.getenv("DATABASE_HOST", "localhost")
         port = os.getenv("DATABASE_PORT", "5432")
-        user = os.getenv("DATABASE_USER", "appuser")
-        password = os.getenv("DATABASE_PASSWORD", "apppassword")
-        name = os.getenv("DATABASE_NAME", "appdb")
+        user = os.getenv("DATABASE_USER")
+        password = os.getenv("DATABASE_PASSWORD")
+        name = os.getenv("DATABASE_NAME")
+        
+        if not all([user, password, name]):
+            raise ValueError("DATABASE_USER, DATABASE_PASSWORD, and DATABASE_NAME environment variables must be set")
         database_url = f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{name}"
     
     engine = create_async_engine(database_url)

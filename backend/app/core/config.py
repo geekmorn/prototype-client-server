@@ -16,14 +16,14 @@ class Settings(BaseSettings):
     database_url: str | None = None
     database_host: str = "localhost"
     database_port: int = 5432
-    database_user: str = "appuser"
-    database_password: str = "apppassword"
-    database_name: str = "appdb"
+    database_user: str  # Required - must be set via environment variable
+    database_password: str  # Required - must be set via environment variable
+    database_name: str  # Required - must be set via environment variable
     database_sslmode: str = "disable"
     alembic_script_location: str = "alembic"
     
     # JWT settings
-    secret_key: str = "your-secret-key-change-in-production"
+    secret_key: str  # Required - must be set via environment variable
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 

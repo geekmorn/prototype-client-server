@@ -7,9 +7,12 @@ import asyncpg
 async def wait_for_db() -> None:
     host = os.environ.get("DATABASE_HOST", "localhost")
     port = int(os.environ.get("DATABASE_PORT", "5432"))
-    user = os.environ.get("DATABASE_USER", "appuser")
-    password = os.environ.get("DATABASE_PASSWORD", "apppassword")
-    database = os.environ.get("DATABASE_NAME", "appdb")
+    user = os.environ.get("DATABASE_USER")
+    password = os.environ.get("DATABASE_PASSWORD")
+    database = os.environ.get("DATABASE_NAME")
+    
+    if not all([user, password, database]):
+        raise ValueError("DATABASE_USER, DATABASE_PASSWORD, and DATABASE_NAME environment variables must be set")
 
     for attempt in range(60):  # up to ~60 seconds
         try:
