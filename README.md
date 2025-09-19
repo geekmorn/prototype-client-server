@@ -2,6 +2,26 @@
 
 A modern full-stack expense tracking application built with FastAPI and React. This application allows users to manage groups, track expenses, and split bills among group members.
 
+## 📑 Table of Contents
+
+- [🏗️ Architecture](#️-architecture)
+- [🛠️ Technologies Used](#️-technologies-used)
+  - [Backend](#backend)
+  - [Frontend](#frontend)
+  - [DevOps & Infrastructure](#devops--infrastructure)
+- [🚀 Quick Start](#-quick-start)
+  - [Prerequisites](#prerequisites)
+  - [Running with Docker (Recommended)](#running-with-docker-recommended)
+- [🔧 Development Setup](#-development-setup)
+  - [Running Backend Separately](#running-backend-separately)
+  - [Running Frontend Separately](#running-frontend-separately)
+- [🐳 Docker Commands](#-docker-commands)
+- [🧪 Testing](#-testing)
+- [🔄 Database Migrations](#-database-migrations)
+- [🚀 Deployment](#-deployment)
+- [🤝 Contributing](#-contributing)
+- [📝 License](#-license)
+
 ## 🏗️ Architecture
 
 This project follows a clean architecture pattern with clear separation of concerns:
