@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime
 from typing import Optional, Dict, Any
 from decimal import Decimal
@@ -23,15 +23,14 @@ class ExpenseUpdate(BaseModel):
 
 
 class ExpenseRead(ExpenseBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     group_id: int
     paid_by_user_id: int
     created_at: datetime
     updated_at: datetime
     paid_by_user: "UserRead"
-
-    class Config:
-        from_attributes = True
 
     @field_validator('metadata', mode='before')
     @classmethod

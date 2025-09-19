@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Optional
 
 from app.api.deps import get_session, get_current_user
 from app.schemas.user import UserCreate, UserRead, UserUpdate, UserLogin, Token
@@ -57,6 +58,15 @@ async def update_current_user_profile(
     if not updated_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return updated_user
+
+
+@router.get("/", response_model=List[UserRead])
+async def get_all_users(
+    name_search: Optional[str] = Query(None, description="Search users by name or email"),
+    session: AsyncSession = Depends(get_session)
+) -> List[UserRead]:
+    service = UserService(session)
+    return await service.get_all_users(name_search)
 
 
 @router.get("/{user_id}", response_model=UserRead)

@@ -78,6 +78,22 @@ class ExpenseRepository:
         await self.session.flush()
         return True
 
+    async def get_user_expenses(self, user_id: int, limit: int = 100, offset: int = 0) -> List[Expense]:
+        """Get all expenses for a user across all groups they're a member of"""
+        from app.models.group import GroupMember
+        
+        result = await self.session.execute(
+            select(Expense)
+            .join(Group, Expense.group_id == Group.id)
+            .join(GroupMember, Group.id == GroupMember.group_id)
+            .where(GroupMember.user_id == user_id)
+            .options(selectinload(Expense.paid_by_user))
+            .order_by(Expense.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        return result.scalars().all()
+
     async def get_group_expense_summary(self, group_id: int) -> Dict[str, Any]:
         # Get total amount and count
         total_result = await self.session.execute(

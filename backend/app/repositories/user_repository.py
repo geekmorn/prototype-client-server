@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate
@@ -43,3 +43,17 @@ class UserRepository:
         await self.session.flush()
         await self.session.refresh(user)
         return user
+
+    async def get_all_users(self, name_search: Optional[str] = None) -> List[User]:
+        query = select(User)
+        
+        if name_search:
+            # Search in both full_name and email fields
+            search_filter = or_(
+                User.full_name.ilike(f"%{name_search}%"),
+                User.email.ilike(f"%{name_search}%")
+            )
+            query = query.where(search_filter)
+        
+        result = await self.session.execute(query)
+        return result.scalars().all()

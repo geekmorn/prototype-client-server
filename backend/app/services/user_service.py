@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.user_repository import UserRepository
@@ -47,3 +47,7 @@ class UserService:
             data={"sub": str(user.id)}, expires_delta=access_token_expires
         )
         return Token(access_token=access_token, token_type="bearer")
+
+    async def get_all_users(self, name_search: Optional[str] = None) -> List[UserRead]:
+        users = await self.repo.get_all_users(name_search)
+        return [UserRead.model_validate(user) for user in users]

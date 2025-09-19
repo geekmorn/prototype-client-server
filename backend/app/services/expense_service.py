@@ -51,6 +51,11 @@ class ExpenseService:
             return None
         return ExpenseRead.model_validate(expense)
 
+    async def get_user_expenses(self, user_id: int, limit: int = 100, offset: int = 0) -> List[ExpenseRead]:
+        """Get all expenses for a user across all groups they're a member of"""
+        expenses = await self.repo.get_user_expenses(user_id, limit, offset)
+        return [ExpenseRead.model_validate(expense) for expense in expenses]
+
     async def get_group_expenses(self, group_id: int, user_id: int, limit: int = 100, offset: int = 0) -> List[ExpenseRead]:
         # Check if user is a member of the group
         if not await self.group_repo.is_member(group_id, user_id):

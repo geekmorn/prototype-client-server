@@ -22,6 +22,18 @@ async def create_expense(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
+@router.get("/", response_model=list[ExpenseRead])
+async def get_all_expenses(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0)
+) -> list[ExpenseRead]:
+    """Get all expenses for the current user across all groups they're a member of"""
+    service = ExpenseService(session)
+    return await service.get_user_expenses(current_user.id, limit, offset)
+
+
 @router.get("/{expense_id}", response_model=ExpenseRead)
 async def get_expense(
     expense_id: int,
