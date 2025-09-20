@@ -21,12 +21,7 @@ class Settings(BaseSettings):
     backend_port: int = 8000
 
     # CORS
-    cors_allow_origins: list[str] = Field(
-        default_factory=lambda: [
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-        ]
-    )
+    cors_allow_origins: str = 'http://localhost:3000'
 
     # Database
     database_url: str | None = None
@@ -42,16 +37,6 @@ class Settings(BaseSettings):
     secret_key: str  # Required - must be set via environment variable
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
-
-    @field_validator("cors_allow_origins", mode="before")
-    @classmethod
-    def _parse_cors_origins(cls, value):  # type: ignore[no-untyped-def]
-        if value is None or value == "":
-            return []
-        if isinstance(value, str):
-            # Accept comma-separated values
-            return [v.strip() for v in value.split(",") if v.strip()]
-        return value
 
 
 @lru_cache
