@@ -1,6 +1,6 @@
-# Expense Tracker - Full Stack Application
+# Expense Tracker client-server Application
 
-A modern full-stack expense tracking application built with FastAPI and React. This application allows users to manage groups, track expenses, and split bills among group members.
+A modern client-server expense tracking application built with FastAPI and React. This application allows users to manage groups, track expenses, and split bills among group members.
 
 ## 📑 Table of Contents
 
