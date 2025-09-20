@@ -28,6 +28,9 @@ services:
       APP_ENV: ${APP_ENV:-production}
       DEBUG: ${DEBUG:-false}
       SECRET_KEY: ${SECRET_KEY:-dev-secret}
+      BACKEND_HOST: ${BACKEND_HOST:-0.0.0.0}
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       DATABASE_HOST: db
       DATABASE_PORT: 5432
       DATABASE_USER: ${DATABASE_USER:-${POSTGRES_USER:-appuser}}
@@ -40,15 +43,15 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "8000:8000"
-    command: ["/bin/sh", "-c", "python -m app.utils.wait_for_db && python run_migrations.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+      - "${BACKEND_PORT:-8000}:${BACKEND_PORT:-8000}"
+    command: ["/bin/sh", "-c", "python -m app.utils.wait_for_db && python run_migrations.py && uvicorn app.main:app --host ${BACKEND_HOST:-0.0.0.0} --port ${BACKEND_PORT:-8000}"]
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8000}
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:${BACKEND_PORT:-8000}}
     container_name: fastproto-frontend
     ports:
       - "3000:80"

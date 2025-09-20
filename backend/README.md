@@ -34,7 +34,7 @@ alembic upgrade head
 
 ### Run locally (without Docker)
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --host ${BACKEND_HOST:-0.0.0.0} --port ${BACKEND_PORT:-8000} --reload
 ```
 
 ### Docker & docker-compose
@@ -82,7 +82,7 @@ backend/
     env.py
     script.py.mako
     versions/
-  .env.example
+  env.example
   requirements.txt
   README.md
 ```
